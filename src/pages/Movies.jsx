@@ -1,20 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import MovieGrid from '../components/MovieGrid';
-import { movies as localMovies } from '../data/data';
+//import { movies as localMovies } from '../data/data';
+import { getMovies, CACHE_KEY } from '../api/tmdb';
+import { forget } from '../api/cache';
 // TODO ขั้นที่ 3: import { useEffect } from 'react' และ import { getMovies, CACHE_KEY } from '../api/tmdb' กับ { forget } from '../api/cache'
 
-function Movies() {
+function Movies() { 
   const [query, setQuery] = useState('');          // คำค้น (controlled input) กรองในเครื่อง ไม่ยิง API
   const [genre, setGenre] = useState('all');       // แนวที่เลือกจากแถบปุ่ม 'all' = ทุกแนว
+  const [movies, setMovies] = useState([]);        // รายการจาก getMovies() (โหลดจริงวันละครั้ง)
+  const [status, setStatus] = useState('loading'); // 'loading' | 'success' | 'error'
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);   // ตัวนับสำหรับปุ่ม "ลองใหม่"     // แนวที่เลือกจากแถบปุ่ม 'all' = ทุกแนว
 
+
+// โหลดตอน component เกิด และทุกครั้งที่กด "ลองใหม่" (reloadKey เปลี่ยน)
+  useEffect(() => {
+    let ignore = false;                            // ธงกันคำตอบเก่ามาทับคำตอบใหม่
+
+    async function load() {
+      setStatus('loading');
+      try {
+        const list = await getMovies();            // ครั้งแรกของวันยิง API ครั้งถัดไปอ่านจาก localStorage
+        if (!ignore) {
+          setMovies(list);
+          setStatus('success');
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err);
+          setStatus('error');
+        }
+      }
+    }
+    load();
+
+    return () => { ignore = true; };               // cleanup: effect รอบเก่าถูกยกเลิก
+  }, [reloadKey]);
   // TODO ขั้นที่ 3: เปลี่ยน 3 ค่าคงที่ด้านล่างให้เป็น state แล้วโหลดจาก API ด้วย useEffect
   //   movies   เริ่มจาก []  (รายการที่ได้จาก getMovies() ซึ่งโหลดจริงวันละครั้ง)
   //   status   'loading' | 'success' | 'error'
   //   error    Error หรือ null
   //   และ reloadKey (ตัวนับ) สำหรับปุ่ม "ลองใหม่" ที่ต้อง forget(CACHE_KEY) ก่อนโหลดซ้ำ
-  const movies = localMovies;
-  const status = 'success';
-  const error = null;
+  //const movies = localMovies;
+  //const status = 'success';
+  //const error = null;
 
   // ค่าที่คำนวณจาก state ไม่ต้องเป็น state เอง: รายชื่อแนวที่มีจริง และรายการหลังกรอง
   const genres = [...new Set(movies.map(m => m.genre).filter(Boolean))];
@@ -29,12 +59,12 @@ function Movies() {
     (active ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-emerald-200 bg-white text-slate-600 hover:bg-emerald-50');
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 md:px-6">
+     <div className="mx-auto max-w-5xl px-4 py-10 md:px-6">
       <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">หนังทั้งหมด</h1>
           <p className="text-sm text-slate-500">
-            แหล่งข้อมูล: data.js {status === 'success' && `| พบ ${shown.length} จาก ${movies.length} เรื่อง`}
+            แหล่งข้อมูล: TMDB (โหลดวันละครั้ง) {status === 'success' && `| พบ ${shown.length} จาก ${movies.length} เรื่อง`}
           </p>
         </div>
         <input value={query} onChange={(e) => setQuery(e.target.value)}
@@ -50,8 +80,9 @@ function Movies() {
         ))}
       </div>
 
+      {/* ปุ่มลองใหม่ต้องล้าง cache ก่อน ไม่งั้นจะได้ของเก่าหรือ error เดิมซ้ำ */}
       <MovieGrid movies={shown} status={status} error={error}
-                 onRetry={() => { /* TODO ขั้นที่ 3: forget(CACHE_KEY) แล้ว setReloadKey(k => k + 1) */ }} />
+                 onRetry={() => { forget(CACHE_KEY); setReloadKey(k => k + 1); }} />
     </div>
   );
 }
