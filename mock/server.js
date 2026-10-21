@@ -7,7 +7,24 @@ const cors = require('cors');
 const movies = require('./movies.json');          // 100 เรื่องชุดเดียวกับ seed.sql ของทีม Go
 
 const app = express();
-app.use(cors());                                   // Go จริงต้องเปิด CORS แบบนี้เหมือนกัน
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://moviehub-670710197.vercel.app',
+  'https://moviehub-670710197-git-main.vercel.app',
+];
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`CORS not allowed for origin: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 app.use(express.json());                           // แปลง body ที่เป็น JSON ให้เป็น object (req.body)
 
 // log ทุก request จะได้เห็นหน้าห้องว่าหน้าเว็บยิงอะไรมา
